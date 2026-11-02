@@ -54,12 +54,24 @@ async function tmdb(path) {
 
 async function getMeta(requestedId = SHOW.id) {
   const cached = cache.get("show");
-  if (cached && cached.expires > Date.now()) return cached.value;
+  if (cached && cached.expires > Date.now()) {
+    const normalizedRequestedId = requestedId.toLowerCase();
+    if (normalizedRequestedId !== SHOW.id && normalizedRequestedId !== cached.imdbId) {
+      throw new Error("Unsupported series ID.");
+    }
+    return { ...cached.value, id: requestedId };
+  }
 
   const [show, externalIds] = await Promise.all([
     tmdb(`/tv/${SHOW.tmdbId}?language=en-GB`),
     tmdb(`/tv/${SHOW.tmdbId}/external_ids`)
   ]);
+
+  const imdbId = externalIds.imdb_id ? externalIds.imdb_id.toLowerCase() : null;
+  const normalizedRequestedId = requestedId.toLowerCase();
+  if (normalizedRequestedId !== SHOW.id && normalizedRequestedId !== imdbId) {
+    throw new Error("Unsupported series ID.");
+  }
 
   const seasons = (show.seasons || []).filter(s => s.season_number > 0);
   const seasonResults = await Promise.all(seasons.map(async season => {
@@ -87,14 +99,8 @@ async function getMeta(requestedId = SHOW.id) {
     })
   );
 
-  const imdbId = externalIds.imdb_id ? externalIds.imdb_id.toLowerCase() : null;
-  const normalizedRequestedId = requestedId.toLowerCase();
-  if (normalizedRequestedId !== SHOW.id && normalizedRequestedId !== imdbId) {
-    throw new Error("Unsupported series ID.");
-  }
-
   const meta = {
-    id: requestedId,
+    id: SHOW.id,
     type: "series",
     name: SHOW.name,
     poster: SHOW.poster,
@@ -112,8 +118,8 @@ async function getMeta(requestedId = SHOW.id) {
     videos
   };
 
-  cache.set("show", { value: meta, expires: Date.now() + 15 * 60 * 1000 });
-  return meta;
+  cache.set("show", { value: meta, imdbId, expires: Date.now() + 15 * 60 * 1000 });
+  return { ...meta, id: requestedId };
 }
 
 const server = http.createServer(async (req, res) => {
