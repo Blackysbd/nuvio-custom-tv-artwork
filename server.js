@@ -97,6 +97,12 @@ async function getMeta() {
     description: show.overview || "",
     releaseInfo: show.first_air_date ? show.first_air_date.slice(0, 4) : "",
     genres: (show.genres || []).map(g => g.name),
+    // Nuvio mobile reads this keyed map for the season selector artwork.
+    app_extras: {
+      seasonPosters: Object.fromEntries(
+        Object.entries(SHOW.seasonPosters).map(([season, poster]) => [String(season), poster])
+      )
+    },
     videos
   };
 
