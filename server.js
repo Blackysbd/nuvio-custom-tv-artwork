@@ -61,7 +61,6 @@ async function getMeta() {
     tmdb(`/tv/${SHOW.tmdbId}/external_ids`)
   ]);
 
-  const imdbId = externalIds.imdb_id;
   const seasons = (show.seasons || []).filter(s => s.season_number > 0);
   const seasonResults = await Promise.all(seasons.map(async season => {
     const data = await tmdb(`/tv/${SHOW.tmdbId}/season/${season.season_number}?language=en-GB`);
@@ -70,9 +69,7 @@ async function getMeta() {
 
   const videos = seasonResults.flatMap(({ seasonNumber, episodes }) =>
     episodes.map(episode => {
-      const id = imdbId
-        ? `${imdbId}:${seasonNumber}:${episode.episode_number}`
-        : `tmdb:${SHOW.tmdbId}:${seasonNumber}:${episode.episode_number}`;
+      const id = `tmdb:${SHOW.tmdbId}:${seasonNumber}:${episode.episode_number}`;
       return {
         id,
         title: episode.name || `Episode ${episode.episode_number}`,
