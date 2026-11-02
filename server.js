@@ -27,7 +27,7 @@ const manifest = {
   description: "A personal TV catalogue with custom show and season artwork.",
   resources: ["catalog", "meta"],
   types: ["series"],
-  idPrefixes: ["tmdb:"],
+  idPrefixes: ["tmdb:", "tt"],
   catalogs: [{ type: "series", id: "my-tv-shows", name: "My TV Shows" }],
   behaviorHints: { configurable: false, configurationRequired: false }
 };
@@ -52,7 +52,7 @@ async function tmdb(path) {
   return response.json();
 }
 
-async function getMeta() {
+async function getMeta(requestedId = SHOW.id) {
   const cached = cache.get("show");
   if (cached && cached.expires > Date.now()) return cached.value;
 
@@ -87,8 +87,14 @@ async function getMeta() {
     })
   );
 
+  const imdbId = externalIds.imdb_id ? externalIds.imdb_id.toLowerCase() : null;
+  const normalizedRequestedId = requestedId.toLowerCase();
+  if (normalizedRequestedId !== SHOW.id && normalizedRequestedId !== imdbId) {
+    throw new Error("Unsupported series ID.");
+  }
+
   const meta = {
-    id: SHOW.id,
+    id: requestedId,
     type: "series",
     name: SHOW.name,
     poster: SHOW.poster,
@@ -141,9 +147,12 @@ const server = http.createServer(async (req, res) => {
 
   const match = path.match(/^\/meta\/series\/(.+)\.json$/);
   if (match) {
-    if (match[1] !== SHOW.id) return json(res, { meta: {} }, 60);
+    const requestedId = match[1];
+    if (requestedId !== SHOW.id && !/^tt\d+$/i.test(requestedId)) {
+      return json(res, { meta: {} }, 60);
+    }
     try {
-      return json(res, { meta: await getMeta() }, 900);
+      return json(res, { meta: await getMeta(requestedId) }, 900);
     } catch (error) {
       console.error(error);
       return json(res, { meta: {}, error: error.message }, 30);
